@@ -17,6 +17,7 @@ executable atp-livescore
   build-depends:       base >=4.7 && <4.8,
                        bytestring == 0.10.*,
                        http-streams == 0.7.*,
+                       libnotify == 0.1.*,
                        io-streams ==1.2.*,
                        tagsoup ==0.13.*,
                        time ==1.4.*
