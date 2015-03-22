@@ -20,7 +20,8 @@ executable atp-livescore
                        libnotify == 0.1.*,
                        io-streams ==1.2.*,
                        tagsoup ==0.13.*,
-                       time ==1.4.*
+                       time ==1.4.*,
+                       unordered-containers ==0.2.*
 
   hs-source-dirs:      src
   default-language:    Haskell2010

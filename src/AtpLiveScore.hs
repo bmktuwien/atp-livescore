@@ -9,6 +9,7 @@ import           Control.Monad
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Char8  as B8
 import           Data.Char
+import qualified Data.HashMap.Strict    as Map
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
 import           Libnotify
@@ -31,26 +32,38 @@ data Score = Score
     { scoreMatch   :: !B.ByteString
     , scorePlayer1 :: !Player
     , scorePlayer2 :: !Player
+    , scoreShowed  :: !Bool
     } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
 startTicker :: IO ()
-startTicker = tickerLoop
+startTicker = tickerLoop Map.empty
   where
-    tickerLoop = do
+    tickerLoop scoreMap = do
       mResp <- getScore
+      let scoreMap' = fromScores $ maybe [] parseScores mResp
+          scoreMap'' = mergeScoreMaps scoreMap scoreMap'
 
-      case mResp of
-       Nothing   -> return ()
-       Just resp -> do
-         let scores = parseScores resp
+      mapM_ notifyScore $ Map.elems scoreMap''
 
-         mapM_ notifyScore scores
-
-      -- wait for 5 sec
+      -- wait for 10 secs
       threadDelay 10000000
 
-      tickerLoop
+      -- update the showed scores and continue
+      tickerLoop $ Map.map (\s -> s { scoreShowed = True }) scoreMap''
+
+    fromScores scores = Map.fromList $ map f scores
+      where
+        f s@Score{..} = ((scoreMatch,
+                          playerName scorePlayer1,
+                          playerName scorePlayer2), s)
+
+    mergeScoreMaps = Map.unionWith merge
+      where
+        merge s1 s2
+          | (scorePlayer1 s1 == scorePlayer1 s2) &&
+            (scorePlayer2 s1 == scorePlayer2 s2) = s1
+          | otherwise = s2
 
 -- | Retrieves the score from 'tennislive.at' server.
 -- The response is an HTML document which should be parsed by 'parseScore'.
@@ -87,7 +100,7 @@ parseScores inp = extractScores matchTable
           let matchName = extractMatchName mn
               player1 = extractPlayer1 p1
               player2 = extractPlayer2 p2 in
-           Score matchName player1 player2 : go xs
+           Score matchName player1 player2 False: go xs
 
     extractMatchName (TagBranch _ _ (td:_)) =
       fromMaybe "Unknown" $ lookupText td
@@ -151,10 +164,9 @@ formatPlayer Player{..} =
 
 notifyScore :: Score -> IO ()
 notifyScore Score{..} =
-  display_ $
+  unless scoreShowed $ display_ $
        summary (printf "%s" $ B8.unpack scoreMatch)
-    <> body (concat [ formatPlayer scorePlayer1
-                    , formatPlayer scorePlayer2
-                    ])
+    <> body (formatPlayer scorePlayer1 ++
+             formatPlayer scorePlayer2)
     <> icon "dialog-information"
     <> timeout Default
