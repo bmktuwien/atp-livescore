@@ -18,6 +18,7 @@ executable atp-livescore
                        bytestring == 0.10.*,
                        http-streams == 0.7.*,
                        io-streams ==1.2.*,
+                       tagsoup ==0.13.*,
                        time ==1.4.*
 
   hs-source-dirs:      src
