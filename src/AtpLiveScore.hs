@@ -72,7 +72,7 @@ getScore =
   bracket
   (openConnection "www.tennislive.at" 80) closeConnection $ \conn -> do
     ts <- getPOSIXTime
-    let currentTS = round $ ts * 100
+    let currentTS = (round $ ts * 100) :: Int
 
     request <- buildRequest $ do
       http GET (B8.pack $ "/tennis_livescore.php?t=live&" ++ show currentTS)
@@ -80,7 +80,7 @@ getScore =
 
     sendRequest conn request emptyBody
 
-    receiveResponse conn $ \p is -> Streams.read is
+    receiveResponse conn $ \_ is -> Streams.read is
 
 -- | Parses the HTML response from the 'tennislive.at' server.
 -- This function assumes a certain structure of the response, so if the
@@ -96,11 +96,14 @@ parseScores inp = extractScores matchTable
     extractScores (TagBranch _ _ subtrees) = go subtrees
       where
         go [] = []
+        go [_] = []
+        go [_,_] = []
         go (mn:p1:p2:xs) =
           let matchName = extractMatchName mn
-              player1 = extractPlayer1 p1
-              player2 = extractPlayer2 p2 in
+              player1 = fromJust $ extractPlayer1 p1
+              player2 = fromJust $ extractPlayer2 p2 in
            Score matchName player1 player2 False: go xs
+    extractScores _ = []
 
     extractMatchName (TagBranch _ _ (td:_)) =
       fromMaybe "Unknown" $ lookupText td
@@ -115,7 +118,8 @@ parseScores inp = extractScores matchTable
           set5 = fromMaybe 0 . lookupInt $ subtrees !! 7
           currentGame = fromMaybe 0 . lookupInt $ subtrees !! 8 in
 
-      Player name [set1, set2, set3, set4, set5] currentGame
+      Just $ Player name [set1, set2, set3, set4, set5] currentGame
+    extractPlayer1 _ = Nothing
 
     extractPlayer2 (TagBranch _ _ subtrees) =
       let name = fromMaybe "Unknown" . lookupText $ head subtrees
@@ -126,7 +130,8 @@ parseScores inp = extractScores matchTable
           set5 = fromMaybe 0 . lookupInt $ subtrees !! 6
           currentGame = fromMaybe 0 . lookupInt $ subtrees !! 7 in
 
-      Player name [set1, set2, set3, set4, set5] currentGame
+      Just $ Player name [set1, set2, set3, set4, set5] currentGame
+    extractPlayer2 _ = Nothing
 
 -------------------------------------------------------------------------------
 
@@ -141,7 +146,7 @@ cleanWhiteSpace (TagBranch str attrs subtrees) =
 
 lookupText :: TagTree B.ByteString -> Maybe B.ByteString
 lookupText (TagLeaf (TagText str)) = Just str
-lookupText (TagLeaf tag) = Nothing
+lookupText (TagLeaf _) = Nothing
 lookupText (TagBranch _ _ subtrees) =
   listToMaybe $ mapMaybe lookupText subtrees
 
