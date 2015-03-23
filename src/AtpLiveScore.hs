@@ -75,7 +75,7 @@ getScore =
     let currentTS = (round $ ts * 100) :: Int
 
     request <- buildRequest $ do
-      http GET (B8.pack $ "/tennis_livescore.php?t=live&" ++ show currentTS)
+      http GET (B8.pack $ "/tennis_livescore.php?t=np&" ++ show currentTS)
       setAccept "text/html"
 
     sendRequest conn request emptyBody
@@ -93,17 +93,21 @@ parseScores inp = extractScores matchTable
     matchTable = fromJust . cleanWhiteSpace $
                  (tagTree . parseTags $ inp) !! 1
 
-    extractScores (TagBranch _ _ subtrees) = go subtrees
+    extractScores (TagLeaf _)              = []
+    extractScores (TagBranch _ _ subtrees) = go subtrees "Unknown"
       where
-        go [] = []
-        go [_] = []
-        go [_,_] = []
-        go (mn:p1:p2:xs) =
-          let matchName = extractMatchName mn
-              player1 = fromJust $ extractPlayer1 p1
-              player2 = fromJust $ extractPlayer2 p2 in
-           Score matchName player1 player2 False: go xs
-    extractScores _ = []
+        go [] _ = []
+        go (x:xs) matchName
+          | TagBranch "tr" [("class","header")] _ <- x =
+              let matchName' = extractMatchName x
+                  (p1:p2:xs') = xs
+                  player1 = fromJust $ extractPlayer1 p1
+                  player2 = fromJust $ extractPlayer2 p2 in
+              Score matchName' player1 player2 False: go xs' matchName'
+          | otherwise =
+              let player1 = fromJust $ extractPlayer1 x
+                  player2 = fromJust $ extractPlayer2 (head xs) in
+              Score matchName player1 player2 False: go (tail xs) matchName
 
     extractMatchName (TagBranch _ _ (td:_)) =
       fromMaybe "Unknown" $ lookupText td
