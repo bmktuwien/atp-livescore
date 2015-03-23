@@ -25,6 +25,7 @@ import           Text.Read
 data Player = Player
     { playerName        :: !B.ByteString
     , playerSets        :: [Int]
+    , playerIsServer    :: !Bool
     , playerCurrentGame :: !Int
     } deriving (Eq, Show)
 
@@ -121,9 +122,10 @@ parseScores inp = extractScores matchTable
           set3 = fromMaybe 0 . lookupInt $ subtrees !! 5
           set4 = fromMaybe 0 . lookupInt $ subtrees !! 6
           set5 = fromMaybe 0 . lookupInt $ subtrees !! 7
+          isServer = containsImage $ subtrees !! 1
           currentGame = fromMaybe 0 . lookupInt $ subtrees !! 8 in
 
-      Just $ Player name [set1, set2, set3, set4, set5] currentGame
+      Just $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer1 _ = Nothing
 
     extractPlayer2 (TagBranch _ _ subtrees) =
@@ -133,9 +135,10 @@ parseScores inp = extractScores matchTable
           set3 = fromMaybe 0 . lookupInt $ subtrees !! 4
           set4 = fromMaybe 0 . lookupInt $ subtrees !! 5
           set5 = fromMaybe 0 . lookupInt $ subtrees !! 6
+          isServer = containsImage $ head subtrees
           currentGame = fromMaybe 0 . lookupInt $ subtrees !! 7 in
 
-      Just $ Player name [set1, set2, set3, set4, set5] currentGame
+      Just $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer2 _ = Nothing
 
 -------------------------------------------------------------------------------
@@ -158,6 +161,12 @@ lookupText (TagBranch _ _ subtrees) =
 lookupInt :: TagTree B.ByteString -> Maybe Int
 lookupInt = maybe Nothing (readMaybe . B8.unpack) . lookupText
 
+containsImage :: TagTree B.ByteString -> Bool
+containsImage (TagLeaf _) = False
+containsImage (TagBranch str _ subtrees)
+  | str == "img" = True
+  | otherwise    = any containsImage subtrees
+
 formatScore :: Score -> String
 formatScore Score{..} =
   concat [ printf "Match: %s\n" $ B8.unpack scoreMatch
@@ -167,10 +176,13 @@ formatScore Score{..} =
 
 formatPlayer :: Player -> String
 formatPlayer Player{..} =
-  let [s1,s2,s3,s4,s5] = playerSets in
+  let [s1,s2,s3,s4,s5] = playerSets
+      name = B8.unpack playerName
+      server = (if playerIsServer then "*" else " ") :: String
+  in
 
-  printf "%d | %d | %d | %d | %d || %.2d   (%s) \n"
-         s1 s2 s3 s4 s5 playerCurrentGame $ B8.unpack playerName
+  printf "%d | %d | %d | %d | %d || %.2d   %s %s \n"
+         s1 s2 s3 s4 s5 playerCurrentGame name server
 
 notifyScore :: Score -> IO ()
 notifyScore Score{..} =
