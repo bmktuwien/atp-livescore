@@ -75,7 +75,8 @@ getScore =
     let currentTS = (round $ ts * 100) :: Int
 
     request <- buildRequest $ do
-      http GET (B8.pack $ "/tennis_livescore.php?t=np&" ++ show currentTS)
+      http GET (B8.pack $ "/tennis_livescore.php?t=live&type=atp" ++
+                show currentTS)
       setAccept "text/html"
 
     sendRequest conn request emptyBody
