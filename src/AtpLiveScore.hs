@@ -3,6 +3,7 @@
 
 module AtpLiveScore where
 
+import           Control.Applicative
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad
@@ -96,52 +97,61 @@ parseScores inp = extractScores matchTable
                  (tagTree . parseTags $ inp) !! 1
 
     extractScores (TagLeaf _)              = []
-    extractScores (TagBranch _ _ subtrees) = go subtrees "Unknown"
+    extractScores (TagBranch _ _ subtrees) = fromMaybe [] $ go subtrees ""
       where
-        go [] _ = []
+        go [] _ = return []
         go (x:xs) matchName
-          | TagBranch "tr" [("class","header")] _ <- x =
-              let matchName' = extractMatchName x
-                  (p1:p2:xs') = xs
-                  player1 = fromJust $ extractPlayer1 p1
-                  player2 = fromJust $ extractPlayer2 p2 in
-              Score matchName' player1 player2 False: go xs' matchName'
-          | otherwise =
-              let player1 = fromJust $ extractPlayer1 x
-                  player2 = fromJust $ extractPlayer2 (head xs) in
-              Score matchName player1 player2 False: go (tail xs) matchName
+          | TagBranch "tr" [("class","header")] _ <- x = do
+              (p1:p2:xs') <- return xs
+              matchName'  <- extractMatchName x
+              player1     <- extractPlayer1 p1
+              player2     <- extractPlayer2 p2
+              scores      <- go xs' matchName'
+              return $ Score matchName' player1 player2 False: scores
+          | otherwise = do
+              (p2:xs') <- return xs
+              player1  <- extractPlayer1 x
+              player2  <- extractPlayer2 p2
+              scores   <- go xs' matchName
+              return $ Score matchName player1 player2 False: scores
 
-    extractMatchName (TagBranch _ _ (td:_)) =
-      fromMaybe "Unknown" $ lookupText td
-    extractMatchName _ = "Unknown"
+    extractMatchName (TagBranch _ _ (td:_)) = lookupText td
+    extractMatchName _                      = Nothing
 
-    extractPlayer1 (TagBranch _ _ subtrees) =
-      let name = fromMaybe "Unknown" . lookupText $ subtrees !! 1
-          set1 = fromMaybe 0 . lookupInt $ subtrees !! 3
-          set2 = fromMaybe 0 . lookupInt $ subtrees !! 4
-          set3 = fromMaybe 0 . lookupInt $ subtrees !! 5
-          set4 = fromMaybe 0 . lookupInt $ subtrees !! 6
-          set5 = fromMaybe 0 . lookupInt $ subtrees !! 7
-          isServer = containsImage $ subtrees !! 1
-          currentGame = fromMaybe 0 . lookupInt $ subtrees !! 8 in
+    extractPlayer1 (TagBranch _ _ subtrees) = do
+      name <- lookupText =<< subtrees !!? 1
+      set1 <- lookupInt  =<< subtrees !!? 3
+      set2 <- lookupInt  =<< subtrees !!? 4
+      set3 <- lookupInt  =<< subtrees !!? 5
+      set4 <- lookupInt  =<< subtrees !!? 6
+      set5 <- lookupInt  =<< subtrees !!? 7
+      currentGame <- lookupInt =<< subtrees !!? 8
+      isServer <- containsImage <$> subtrees !!? 1
 
-      Just $ Player name [set1, set2, set3, set4, set5] isServer currentGame
+      return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer1 _ = Nothing
 
-    extractPlayer2 (TagBranch _ _ subtrees) =
-      let name = fromMaybe "Unknown" . lookupText $ head subtrees
-          set1 = fromMaybe 0 . lookupInt $ subtrees !! 2
-          set2 = fromMaybe 0 . lookupInt $ subtrees !! 3
-          set3 = fromMaybe 0 . lookupInt $ subtrees !! 4
-          set4 = fromMaybe 0 . lookupInt $ subtrees !! 5
-          set5 = fromMaybe 0 . lookupInt $ subtrees !! 6
-          isServer = containsImage $ head subtrees
-          currentGame = fromMaybe 0 . lookupInt $ subtrees !! 7 in
+    extractPlayer2 (TagBranch _ _ subtrees) = do
+      name <- lookupText =<< subtrees !!? 0
+      set1 <- lookupInt =<< subtrees !!? 2
+      set2 <- lookupInt =<< subtrees !!? 3
+      set3 <- lookupInt =<< subtrees !!? 4
+      set4 <- lookupInt =<< subtrees !!? 5
+      set5 <- lookupInt =<< subtrees !!? 6
+      currentGame <- lookupInt =<< subtrees !!? 7
+      isServer <- containsImage <$> subtrees !!? 0
 
-      Just $ Player name [set1, set2, set3, set4, set5] isServer currentGame
+      return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer2 _ = Nothing
 
 -------------------------------------------------------------------------------
+-- Various helper functions
+
+(!!?) :: [a] -> Int -> Maybe a
+(!!?) ls i
+  | i < 0         = Nothing
+  | i < length ls = Just $ ls !! i
+  | otherwise     = Nothing
 
 cleanWhiteSpace :: TagTree B.ByteString -> Maybe (TagTree B.ByteString)
 cleanWhiteSpace t@(TagLeaf (TagText str))
