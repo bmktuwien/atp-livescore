@@ -90,11 +90,11 @@ getScore =
 -- assumed structure does not match, this function can fail or return
 -- non-sensical data.
 parseScores :: B.ByteString -> [Score]
-parseScores inp = extractScores matchTable
+parseScores inp = maybe [] extractScores mMatchTable
   where
     -- second element in the list is our match table
-    matchTable = fromJust . cleanWhiteSpace $
-                 (tagTree . parseTags $ inp) !! 1
+    mMatchTable = cleanWhiteSpace =<<
+                  (tagTree . parseTags $ inp) !!? 1
 
     extractScores (TagLeaf _)              = []
     extractScores (TagBranch _ _ subtrees) = fromMaybe [] $ go subtrees ""
@@ -104,45 +104,32 @@ parseScores inp = extractScores matchTable
           | TagBranch "tr" [("class","header")] _ <- x = do
               (p1:p2:xs') <- return xs
               matchName'  <- extractMatchName x
-              player1     <- extractPlayer1 p1
-              player2     <- extractPlayer2 p2
+              player1     <- extractPlayer p1 1
+              player2     <- extractPlayer p2 0
               scores      <- go xs' matchName'
               return $ Score matchName' player1 player2 False: scores
           | otherwise = do
               (p2:xs') <- return xs
-              player1  <- extractPlayer1 x
-              player2  <- extractPlayer2 p2
+              player1  <- extractPlayer x 1
+              player2  <- extractPlayer p2 0
               scores   <- go xs' matchName
               return $ Score matchName player1 player2 False: scores
 
     extractMatchName (TagBranch _ _ (td:_)) = lookupText td
     extractMatchName _                      = Nothing
 
-    extractPlayer1 (TagBranch _ _ subtrees) = do
-      name <- lookupText =<< subtrees !!? 1
-      set1 <- lookupInt  =<< subtrees !!? 3
-      set2 <- lookupInt  =<< subtrees !!? 4
-      set3 <- lookupInt  =<< subtrees !!? 5
-      set4 <- lookupInt  =<< subtrees !!? 6
-      set5 <- lookupInt  =<< subtrees !!? 7
-      currentGame <- lookupInt =<< subtrees !!? 8
-      isServer <- containsImage <$> subtrees !!? 1
+    extractPlayer (TagBranch _ _ subtrees) i = do
+      name <- lookupText =<< subtrees !!? i
+      set1 <- lookupInt  =<< subtrees !!? (i+2)
+      set2 <- lookupInt  =<< subtrees !!? (i+3)
+      set3 <- lookupInt  =<< subtrees !!? (i+4)
+      set4 <- lookupInt  =<< subtrees !!? (i+5)
+      set5 <- lookupInt  =<< subtrees !!? (i+6)
+      currentGame <- lookupInt =<< subtrees !!? (i+7)
+      isServer    <- containsImage <$> subtrees !!? i
 
       return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
-    extractPlayer1 _ = Nothing
-
-    extractPlayer2 (TagBranch _ _ subtrees) = do
-      name <- lookupText =<< subtrees !!? 0
-      set1 <- lookupInt =<< subtrees !!? 2
-      set2 <- lookupInt =<< subtrees !!? 3
-      set3 <- lookupInt =<< subtrees !!? 4
-      set4 <- lookupInt =<< subtrees !!? 5
-      set5 <- lookupInt =<< subtrees !!? 6
-      currentGame <- lookupInt =<< subtrees !!? 7
-      isServer <- containsImage <$> subtrees !!? 0
-
-      return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
-    extractPlayer2 _ = Nothing
+    extractPlayer _ _ = Nothing
 
 -------------------------------------------------------------------------------
 -- Various helper functions
