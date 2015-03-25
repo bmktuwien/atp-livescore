@@ -120,13 +120,14 @@ parseScores inp = maybe [] extractScores mMatchTable
 
     extractPlayer (TagBranch _ _ subtrees) i = do
       name <- lookupText =<< subtrees !!? i
-      set1 <- lookupInt  =<< subtrees !!? (i+2)
-      set2 <- lookupInt  =<< subtrees !!? (i+3)
-      set3 <- lookupInt  =<< subtrees !!? (i+4)
-      set4 <- lookupInt  =<< subtrees !!? (i+5)
-      set5 <- lookupInt  =<< subtrees !!? (i+6)
-      currentGame <- lookupInt =<< subtrees !!? (i+7)
-      isServer    <- containsImage <$> subtrees !!? i
+      isServer <- containsImage <$> subtrees !!? i
+
+      let set1 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+2)
+          set2 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+3)
+          set3 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+4)
+          set4 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+5)
+          set5 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+6)
+          currentGame = fromMaybe 0 $ lookupInt =<< subtrees !!? (i+7)
 
       return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer _ _ = Nothing
