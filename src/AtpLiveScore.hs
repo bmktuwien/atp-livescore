@@ -172,19 +172,22 @@ notifyScore imgMap Score{..} =
        summary (printf "%s" $ B8.unpack scoreMatch)
     <> body (formatPlayer scorePlayer1 ++
              formatPlayer scorePlayer2)
-    -- TODO: find a way to show both images
-    <> playerImg (playerName scorePlayer1)
-                 (playerName scorePlayer2)
+    <> playerImg
     <> timeout Default
   where
-    playerImg player1 player2 = do
-      let mImg1 = lookupPlayerImg imgMap player1
-          mImg2 = lookupPlayerImg imgMap player2
+    playerImg = do
+      let mImg1 = lookupPlayerImg imgMap $ playerName scorePlayer1
+          mImg2 = lookupPlayerImg imgMap $ playerName scorePlayer2
 
       case (mImg1,mImg2) of
+       (Just pixBuf1, Just pixBuf2) -> if player1IsLeading
+                                       then image pixBuf1
+                                       else image pixBuf2
        (Just pixBuf,_) -> image pixBuf
        (_,Just pixBuf) -> image pixBuf
        _               -> icon "dialog-information"
+      where
+        player1IsLeading = scorePlayer1 `isLeading` scorePlayer2
 
 formatScore :: Score -> String
 formatScore Score{..} =
@@ -280,3 +283,19 @@ lookupPlayerImg ((n,pb):xs) player
       where
         f ' ' = '_'
         f c   = c
+
+isLeading :: Player -> Player -> Bool
+player1 `isLeading` player2 =
+  setsP1 > setsP2 ||
+  (setsP1 == setsP2 && gameP1 > gameP2)
+  where
+    setsZip = zip (playerSets player1) (playerSets player2)
+    setsP1 =  sum $ map (\(s1,s2) -> if s1 >  s2
+                                     then (1 :: Int)
+                                     else (0 :: Int)) setsZip
+    setsP2 =  sum $ map (\(s1,s2) -> if s1 <  s2
+                                     then (1 :: Int)
+                                     else (0 :: Int)) setsZip
+
+    gameP1 = playerCurrentGame player1
+    gameP2 = playerCurrentGame player2
