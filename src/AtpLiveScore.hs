@@ -156,12 +156,12 @@ parseScores inp = maybe [] extractScores mMatchTable
       name <- lookupText =<< subtrees !!? i
       isServer <- containsImage <$> subtrees !!? i
 
-      let set1 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+2)
-          set2 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+3)
-          set3 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+4)
-          set4 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+5)
-          set5 = fromMaybe 0 $ lookupInt  =<< subtrees !!? (i+6)
-          currentGame = fromMaybe 0 $ lookupInt =<< subtrees !!? (i+7)
+      let set1 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+2)
+          set2 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+3)
+          set3 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+4)
+          set4 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+5)
+          set5 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+6)
+          currentGame = fromMaybe 0 $ lookupPoint =<< subtrees !!? (i+7)
 
       return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer _ _ = Nothing
@@ -203,9 +203,11 @@ formatPlayer Player{..} =
       server = (if playerIsServer then "*" else " ") :: String
   in
 
-  printf "%d | %d | %d | %d | %d || %.2d   %s %s \n"
-         s1 s2 s3 s4 s5 playerCurrentGame name server
-
+   if playerCurrentGame <= 40
+   then printf "%d | %d | %d | %d | %d || %.2d   %s %s \n"
+        s1 s2 s3 s4 s5 playerCurrentGame name server
+   else printf "%d | %d | %d | %d | %d || %2s   %s %s \n"
+        s1 s2 s3 s4 s5 ("A" :: String) name server
 -------------------------------------------------------------------------------
 -- Various helper functions
 
@@ -229,8 +231,14 @@ lookupText (TagLeaf _) = Nothing
 lookupText (TagBranch _ _ subtrees) =
   listToMaybe $ mapMaybe lookupText subtrees
 
-lookupInt :: TagTree B.ByteString -> Maybe Int
-lookupInt = maybe Nothing (readMaybe . B8.unpack) . lookupText
+lookupGame :: TagTree B.ByteString -> Maybe Int
+lookupGame = maybe Nothing (readMaybe . B8.unpack) . lookupText
+
+lookupPoint :: TagTree B.ByteString -> Maybe Int
+lookupPoint t = case lookupText t of
+                  Nothing   -> Nothing
+                  Just "A"  -> Just 45
+                  Just text -> readMaybe . B8.unpack $ text
 
 containsImage :: TagTree B.ByteString -> Bool
 containsImage (TagLeaf _) = False
