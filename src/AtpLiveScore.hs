@@ -315,10 +315,10 @@ player1 `isLeading` player2 =
       | s1 >= 6 || s2 >= 6 = abs(s1 - s2) > 1
       | otherwise = False
 
-    calcSetsWon sets' =
-      sum $ map (\(s1,s2) -> if s1 > s2
-                             then (1 :: Int)
-                             else (0 :: Int)) sets'
+    calcSetsWon = sum . map f
+      where
+        f :: (Int,Int) -> Int
+        f (s1,s2) = if s1 > s2 then 1 else 0
 
 lower :: String -> String
 lower = map toLower
