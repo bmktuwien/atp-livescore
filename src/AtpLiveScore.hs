@@ -23,6 +23,18 @@ import           Text.Read
 
 -------------------------------------------------------------------------------
 
+data TourType = ATP | WTA
+
+instance Show TourType where
+  show ATP = "atp"
+  show WTA = "wta"
+
+data Settings = Settings
+    { settingsFollowRegex :: Maybe String
+    , settingsTourType    :: Maybe TourType
+    } deriving (Show)
+
+
 data Player = Player
     { playerName        :: !B.ByteString
     , playerSets        :: [Int]
@@ -38,11 +50,11 @@ data Score = Score
     } deriving (Eq, Show)
 
 -------------------------------------------------------------------------------
-startTicker :: IO ()
-startTicker = tickerLoop Map.empty
+startTicker :: Settings -> IO ()
+startTicker Settings{..} = tickerLoop Map.empty
   where
     tickerLoop scoreMap = do
-      mResp <- getScore
+      mResp <- getScore settingsTourType
       let scoreMap' = fromScores $ maybe [] parseScores mResp
           scoreMap'' = mergeScoreMaps scoreMap scoreMap'
 
@@ -69,15 +81,16 @@ startTicker = tickerLoop Map.empty
 
 -- | Retrieves the score from 'tennislive.at' server.
 -- The response is an HTML document which should be parsed by 'parseScore'.
-getScore :: IO (Maybe B.ByteString)
-getScore =
+getScore :: Maybe TourType -> IO (Maybe B.ByteString)
+getScore mType =
   bracket
   (openConnection "www.tennislive.at" 80) closeConnection $ \conn -> do
     ts <- getPOSIXTime
     let currentTS = (round $ ts * 100) :: Int
+        typeQuery = maybe "" (\t -> "&type=" ++ show t) mType
 
     request <- buildRequest $ do
-      http GET (B8.pack $ "/tennis_livescore.php?t=live&type=atp&" ++
+      http GET (B8.pack $ "/tennis_livescore.php?t=live" ++ typeQuery ++ "&" ++
                 show currentTS)
       setAccept "text/html"
 
@@ -148,7 +161,6 @@ cleanWhiteSpace t@(TagLeaf (TagText str))
 cleanWhiteSpace (TagLeaf tag) = Just (TagLeaf tag)
 cleanWhiteSpace (TagBranch str attrs subtrees) =
   Just . TagBranch str attrs . catMaybes $ map cleanWhiteSpace subtrees
-
 
 lookupText :: TagTree B.ByteString -> Maybe B.ByteString
 lookupText (TagLeaf (TagText str)) = Just str
