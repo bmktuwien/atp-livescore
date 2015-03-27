@@ -298,8 +298,8 @@ lookupPlayerImg ((n,pb):xs) player
 isLeading :: Player -> Player -> Bool
 player1 `isLeading` player2 =
   (setsP1 > setsP2) ||
-  (setsP1 == setsP2 && currentSetP1 > currentSetP2) ||
-  (setsP1 == setsP2 && currentSetP1 == currentSetP2 && currentGameP1 > currentGameP2)
+  (setsP1 == setsP2 && curSetP1 > curSetP2) ||
+  (setsP1 == setsP2 && curSetP1 == curSetP2 && curGameP1 > curGameP2)
   where
     setsZip = zip (playerSets player1) (playerSets player2)
     finishedSets = filter isFinishedSet setsZip
@@ -311,11 +311,11 @@ player1 `isLeading` player2 =
                                      then (1 :: Int)
                                      else (0 :: Int)) finishedSets
 
-    currentSetP1 = fst . head $ dropWhile isFinishedSet setsZip
-    currentSetP2 = snd . head $ dropWhile isFinishedSet setsZip
+    curSetP1 = fst . head $ dropWhile isFinishedSet setsZip
+    curSetP2 = snd . head $ dropWhile isFinishedSet setsZip
 
-    currentGameP1 = playerCurrentGame player1
-    currentGameP2 = playerCurrentGame player2
+    curGameP1 = playerCurrentGame player1
+    curGameP2 = playerCurrentGame player2
 
     isFinishedSet (7,6) = True
     isFinishedSet (6,7) = True
