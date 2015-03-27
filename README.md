@@ -1,10 +1,9 @@
 # ATP Livescore
 
 A simple toy program implemented in Haskell, which searches the web
-for live tennis scores and shows them in certain time intervals
-as desktop notifications.
+for live tennis scores and shows them as desktop notifications.
 
-Currenlty the scores are fetched only from "tennislive.at" and the
+Currenlty the scores are fetched from "www.tennislive.at" and the
 notifications are only supported where `libnotify` library is available.
 
 ![](https://github.com/bmktuwien/atp-livescore/blob/master/res/screenshot.jpg)
