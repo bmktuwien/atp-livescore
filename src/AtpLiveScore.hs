@@ -20,6 +20,7 @@ import           Text.HTML.TagSoup
 import           Text.HTML.TagSoup.Tree
 import           Text.Printf
 import           Text.Read
+import qualified Text.Regex.PCRE.Light  as PCRE
 
 -------------------------------------------------------------------------------
 
@@ -30,7 +31,7 @@ instance Show TourType where
   show WTA = "wta"
 
 data Settings = Settings
-    { settingsFollowRegex :: Maybe String
+    { settingsFollowRegex :: Maybe B.ByteString
     , settingsTourType    :: Maybe TourType
     } deriving (Show)
 
@@ -57,8 +58,9 @@ startTicker Settings{..} = tickerLoop Map.empty
       mResp <- getScore settingsTourType
       let scoreMap' = fromScores $ maybe [] parseScores mResp
           scoreMap'' = mergeScoreMaps scoreMap scoreMap'
+          scores = filterFollowing settingsFollowRegex $ Map.elems scoreMap''
 
-      mapM_ notifyScore $ Map.elems scoreMap''
+      mapM_ notifyScore scores
 
       -- wait for 10 secs
       threadDelay 10000000
@@ -78,6 +80,12 @@ startTicker Settings{..} = tickerLoop Map.empty
           | (scorePlayer1 s1 == scorePlayer1 s2) &&
             (scorePlayer2 s1 == scorePlayer2 s2) = s1
           | otherwise = s2
+
+    filterFollowing Nothing      = id
+    filterFollowing (Just regex) = filter f
+      where
+        f Score{..} = regexMatches regex (playerName scorePlayer1) ||
+                      regexMatches regex (playerName scorePlayer2)
 
 -- | Retrieves the score from 'tennislive.at' server.
 -- The response is an HTML document which should be parsed by 'parseScore'.
@@ -145,6 +153,32 @@ parseScores inp = maybe [] extractScores mMatchTable
       return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer _ _ = Nothing
 
+notifyScore :: Score -> IO ()
+notifyScore Score{..} =
+  unless scoreShowed $ display_ $
+       summary (printf "%s" $ B8.unpack scoreMatch)
+    <> body (formatPlayer scorePlayer1 ++
+             formatPlayer scorePlayer2)
+    <> icon "dialog-information"
+    <> timeout Default
+
+formatScore :: Score -> String
+formatScore Score{..} =
+  concat [ printf "Match: %s\n" $ B8.unpack scoreMatch
+         , formatPlayer scorePlayer1
+         , formatPlayer scorePlayer2
+         ]
+
+formatPlayer :: Player -> String
+formatPlayer Player{..} =
+  let [s1,s2,s3,s4,s5] = playerSets
+      name = B8.unpack playerName
+      server = (if playerIsServer then "*" else " ") :: String
+  in
+
+  printf "%d | %d | %d | %d | %d || %.2d   %s %s \n"
+         s1 s2 s3 s4 s5 playerCurrentGame name server
+
 -------------------------------------------------------------------------------
 -- Various helper functions
 
@@ -177,28 +211,7 @@ containsImage (TagBranch str _ subtrees)
   | str == "img" = True
   | otherwise    = any containsImage subtrees
 
-formatScore :: Score -> String
-formatScore Score{..} =
-  concat [ printf "Match: %s\n" $ B8.unpack scoreMatch
-         , formatPlayer scorePlayer1
-         , formatPlayer scorePlayer2
-         ]
-
-formatPlayer :: Player -> String
-formatPlayer Player{..} =
-  let [s1,s2,s3,s4,s5] = playerSets
-      name = B8.unpack playerName
-      server = (if playerIsServer then "*" else " ") :: String
-  in
-
-  printf "%d | %d | %d | %d | %d || %.2d   %s %s \n"
-         s1 s2 s3 s4 s5 playerCurrentGame name server
-
-notifyScore :: Score -> IO ()
-notifyScore Score{..} =
-  unless scoreShowed $ display_ $
-       summary (printf "%s" $ B8.unpack scoreMatch)
-    <> body (formatPlayer scorePlayer1 ++
-             formatPlayer scorePlayer2)
-    <> icon "dialog-information"
-    <> timeout Default
+regexMatches :: B.ByteString -> B.ByteString -> Bool
+regexMatches rgxStr str = isJust $ PCRE.match regex str []
+  where
+    regex = PCRE.compile rgxStr []
