@@ -278,9 +278,6 @@ loadImages imgDir = do
 
     return (lower playerName, pixbuf)
 
-lower :: String -> String
-lower = map toLower
-
 lookupPlayerImg :: PlayerImgMap -> B.ByteString -> Maybe Pixbuf
 lookupPlayerImg [] _ = Nothing
 lookupPlayerImg ((n,pb):xs) player
@@ -301,24 +298,30 @@ player1 `isLeading` player2 =
   (setsP1 == setsP2 && curSetP1 > curSetP2) ||
   (setsP1 == setsP2 && curSetP1 == curSetP2 && curGameP1 > curGameP2)
   where
-    setsZip = zip (playerSets player1) (playerSets player2)
-    finishedSets = filter isFinishedSet setsZip
+    sets = zip (playerSets player1) (playerSets player2)
+    finishedSets = filter isFinished sets
 
-    setsP1 =  sum $ map (\(s1,s2) -> if s1 >  s2
-                                     then (1 :: Int)
-                                     else (0 :: Int)) finishedSets
-    setsP2 =  sum $ map (\(s1,s2) -> if s1 <  s2
-                                     then (1 :: Int)
-                                     else (0 :: Int)) finishedSets
+    setsP1 = calcSetsWon finishedSets
+    setsP2 = calcSetsWon $ map flipTuple finishedSets
 
-    curSetP1 = fst . head $ dropWhile isFinishedSet setsZip
-    curSetP2 = snd . head $ dropWhile isFinishedSet setsZip
+    (curSetP1, curSetP2) = head $ dropWhile isFinished sets
 
     curGameP1 = playerCurrentGame player1
     curGameP2 = playerCurrentGame player2
 
-    isFinishedSet (7,6) = True
-    isFinishedSet (6,7) = True
-    isFinishedSet (s1,s2)
+    isFinished (7,6) = True
+    isFinished (6,7) = True
+    isFinished (s1,s2)
       | s1 >= 6 || s2 >= 6 = abs(s1 - s2) > 1
       | otherwise = False
+
+    calcSetsWon sets' =
+      sum $ map (\(s1,s2) -> if s1 > s2
+                             then (1 :: Int)
+                             else (0 :: Int)) sets'
+
+lower :: String -> String
+lower = map toLower
+
+flipTuple :: (a,b) -> (b,a)
+flipTuple (a,b) = (b,a)
