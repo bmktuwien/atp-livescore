@@ -30,9 +30,15 @@ instance Show TourType where
   show ATP = "atp"
   show WTA = "wta"
 
+instance Read TourType where
+  readsPrec _ "atp" = [(ATP, "")]
+  readsPrec _ "wta" = [(WTA, "")]
+  readsPrec _ _     = error "unknown tour type"
+
 data Settings = Settings
     { settingsFollowRegex :: Maybe B.ByteString
     , settingsTourType    :: Maybe TourType
+    , settingsRefresh     :: !Int
     } deriving (Show)
 
 
@@ -62,8 +68,7 @@ startTicker Settings{..} = tickerLoop Map.empty
 
       mapM_ notifyScore scores
 
-      -- wait for 10 secs
-      threadDelay 10000000
+      threadDelay (settingsRefresh * 1000000)
 
       -- update the showed scores and continue
       tickerLoop $ Map.map (\s -> s { scoreShowed = True }) scoreMap''
