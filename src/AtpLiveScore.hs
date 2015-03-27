@@ -87,7 +87,7 @@ getScore mType =
   (openConnection "www.tennislive.at" 80) closeConnection $ \conn -> do
     ts <- getPOSIXTime
     let currentTS = (round $ ts * 100) :: Int
-        typeQuery = maybe "" (\t -> "&type=" ++ show t) mType
+        typeQuery = maybe "" (("&type=" ++) . show) mType
 
     request <- buildRequest $ do
       http GET (B8.pack $ "/tennis_livescore.php?t=live" ++ typeQuery ++ "&" ++
