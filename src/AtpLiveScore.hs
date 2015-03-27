@@ -322,5 +322,3 @@ player1 `isLeading` player2 =
     isFinishedSet (s1,s2)
       | s1 >= 6 || s2 >= 6 = abs(s1 - s2) > 1
       | otherwise = False
-
-
