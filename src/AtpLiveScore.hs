@@ -202,12 +202,15 @@ formatPlayer Player{..} =
       name = B8.unpack playerName
       server = (if playerIsServer then "*" else " ") :: String
   in
+   printf "%d | %d | %d | %d | %d || %s   %s %s \n"
+   s1 s2 s3 s4 s5 (showGame playerCurrentGame) name server
 
-   if playerCurrentGame <= 40
-   then printf "%d | %d | %d | %d | %d || %.2d   %s %s \n"
-        s1 s2 s3 s4 s5 playerCurrentGame name server
-   else printf "%d | %d | %d | %d | %d || %2s   %s %s \n"
-        s1 s2 s3 s4 s5 ("A" :: String) name server
+  where
+    showGame :: Int -> String
+    showGame g
+      | g <= 40   = printf "%.2d" g
+      | otherwise = printf "%2s" ("A" :: String)
+
 -------------------------------------------------------------------------------
 -- Various helper functions
 
