@@ -7,20 +7,23 @@ import           Control.Applicative
 import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad
-import qualified Data.ByteString        as B
-import qualified Data.ByteString.Char8  as B8
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Char8      as B8
 import           Data.Char
-import qualified Data.HashMap.Strict    as Map
+import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
+import           Graphics.UI.Gtk.Gdk.Pixbuf
 import           Libnotify
 import           Network.Http.Client
-import qualified System.IO.Streams      as Streams
+import           System.Directory
+import           System.FilePath
+import qualified System.IO.Streams          as Streams
 import           Text.HTML.TagSoup
 import           Text.HTML.TagSoup.Tree
 import           Text.Printf
 import           Text.Read
-import qualified Text.Regex.PCRE.Light  as PCRE
+import qualified Text.Regex.PCRE.Light      as PCRE
 
 -------------------------------------------------------------------------------
 
@@ -39,6 +42,7 @@ data Settings = Settings
     { settingsFollowRegex :: Maybe B.ByteString
     , settingsTourType    :: Maybe TourType
     , settingsRefresh     :: !Int
+    , settingsImgDir      :: Maybe FilePath
     } deriving (Show)
 
 
@@ -56,22 +60,26 @@ data Score = Score
     , scoreShowed  :: !Bool
     } deriving (Eq, Show)
 
+type PlayerImgMap = [(String, Pixbuf)]
+
 -------------------------------------------------------------------------------
 startTicker :: Settings -> IO ()
-startTicker Settings{..} = tickerLoop Map.empty
+startTicker Settings{..} = do
+  imgMap <- maybe (return []) loadImages settingsImgDir
+  tickerLoop imgMap Map.empty
   where
-    tickerLoop scoreMap = do
+    tickerLoop imgMap scoreMap = do
       mResp <- getScore settingsTourType
       let scoreMap' = fromScores $ maybe [] parseScores mResp
           scoreMap'' = mergeScoreMaps scoreMap scoreMap'
           scores = filterFollowing settingsFollowRegex $ Map.elems scoreMap''
 
-      mapM_ notifyScore scores
+      mapM_ (notifyScore imgMap) scores
 
       threadDelay (settingsRefresh * 1000000)
 
       -- update the showed scores and continue
-      tickerLoop $ Map.map (\s -> s { scoreShowed = True }) scoreMap''
+      tickerLoop imgMap $ Map.map (\s -> s { scoreShowed = True }) scoreMap''
 
     fromScores scores = Map.fromList $ map f scores
       where
@@ -158,14 +166,25 @@ parseScores inp = maybe [] extractScores mMatchTable
       return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
     extractPlayer _ _ = Nothing
 
-notifyScore :: Score -> IO ()
-notifyScore Score{..} =
+notifyScore :: PlayerImgMap -> Score -> IO ()
+notifyScore imgMap Score{..} =
   unless scoreShowed $ display_ $
        summary (printf "%s" $ B8.unpack scoreMatch)
     <> body (formatPlayer scorePlayer1 ++
              formatPlayer scorePlayer2)
-    <> icon "dialog-information"
+    -- TODO: find a way to show both images
+    <> playerImg (playerName scorePlayer1)
+                 (playerName scorePlayer2)
     <> timeout Default
+  where
+    playerImg player1 player2 = do
+      let mImg1 = lookupPlayerImg imgMap player1
+          mImg2 = lookupPlayerImg imgMap player2
+
+      case (mImg1,mImg2) of
+       (Just pixBuf,_) -> image pixBuf
+       (_,Just pixBuf) -> image pixBuf
+       _               -> icon "dialog-information"
 
 formatScore :: Score -> String
 formatScore Score{..} =
@@ -220,3 +239,44 @@ regexMatches :: B.ByteString -> B.ByteString -> Bool
 regexMatches rgxStr str = isJust $ PCRE.match regex str []
   where
     regex = PCRE.compile rgxStr []
+
+readDirectory :: FilePath -> IO [FilePath]
+readDirectory dir = do
+  names <- getDirectoryContents dir
+  let properNames = filter (`notElem` [".", ".."]) names
+  paths <- forM properNames $ \name -> do
+    let path = dir </> name
+    isDirectory <- doesDirectoryExist path
+    if isDirectory
+      then readDirectory path
+      else return [path]
+
+  return (concat paths)
+
+loadImages :: FilePath -> IO PlayerImgMap
+loadImages imgDir = do
+  paths <- readDirectory imgDir
+
+  forM paths $ \path -> do
+    let playerName = dropExtensions . takeFileName $ path
+
+    pixbuf <- pixbufNewFromFile path
+
+    return (lower playerName, pixbuf)
+
+lower :: String -> String
+lower = map toLower
+
+lookupPlayerImg :: PlayerImgMap -> B.ByteString -> Maybe Pixbuf
+lookupPlayerImg [] _ = Nothing
+lookupPlayerImg ((n,pb):xs) player
+  | regexMatches n' player' = Just pb
+  | otherwise = lookupPlayerImg xs player
+  where
+    n' = B8.pack n
+    player' = B8.pack . replaceSpace . lower . B8.unpack $ player
+
+    replaceSpace = map f
+      where
+        f ' ' = '_'
+        f c   = c

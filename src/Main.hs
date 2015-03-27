@@ -14,6 +14,7 @@ data Args = Args
     { aFollow  :: String
     , aType    :: String
     , aRefresh :: Int
+    , aImgDir  :: FilePath
     } deriving (Show)
 
 -------------------------------------------------------------------------------
@@ -31,11 +32,17 @@ args = runA $ proc () -> do
                                <> long "type"
                                <> help "Only scores of matches of the given tour \
                                   \type are shown. Possible values: atp|wta") -< ()
-  aRefresh <- asA $ option (value 10 <> short 'r'
+  aRefresh <- asA $ option (value 10
+                            <> short 'r'
                             <> long "refresh-period"
                             <> metavar "SECS"
                             <> help "Time interval in which the data will be fetched"
                             <> showDefault) -< ()
+  aImgDir  <- asA $ strOption (value ""
+                               <> short 'i'
+                               <> long "img-dir"
+                               <> metavar "DIR"
+                               <> help "Directory with player image files") -< ()
   returnA -< Args {..}
 
 getArgs :: IO Args
@@ -53,5 +60,6 @@ main = do
     mkSettings Args{..} =
       let mFollow = if null aFollow then Nothing else Just $ B8.pack aFollow
           mType   = if null aType then Nothing else Just $ read aType
+          mImgDir = if null aImgDir then Nothing else Just aImgDir
       in
-       Settings mFollow mType aRefresh
+       Settings mFollow mType aRefresh mImgDir
