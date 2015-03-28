@@ -13,6 +13,7 @@ import           Data.Char
 import qualified Data.HashMap.Strict        as Map
 import           Data.Maybe
 import           Data.Time.Clock.POSIX
+import           Data.Tuple
 import           Graphics.UI.Gtk.Gdk.Pixbuf
 import           Libnotify
 import           Network.Http.Client
@@ -302,7 +303,7 @@ player1 `isLeading` player2 =
     finishedSets = filter isFinished sets
 
     setsP1 = calcSetsWon finishedSets
-    setsP2 = calcSetsWon $ map flipTuple finishedSets
+    setsP2 = calcSetsWon $ map swap finishedSets
 
     (curSetP1, curSetP2) = head $ dropWhile isFinished sets
 
@@ -323,5 +324,3 @@ player1 `isLeading` player2 =
 lower :: String -> String
 lower = map toLower
 
-flipTuple :: (a,b) -> (b,a)
-flipTuple (a,b) = (b,a)
