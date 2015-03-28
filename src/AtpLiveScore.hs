@@ -64,6 +64,7 @@ data Score = Score
 type PlayerImgMap = [(String, Pixbuf)]
 
 -------------------------------------------------------------------------------
+
 startTicker :: Settings -> IO ()
 startTicker Settings{..} = do
   imgMap <- maybe (return []) loadImages settingsImgDir
@@ -71,6 +72,7 @@ startTicker Settings{..} = do
   where
     tickerLoop imgMap scoreMap = do
       mResp <- getScore settingsTourType
+
       let scoreMap' = fromScores $ maybe [] parseScores mResp
           scoreMap'' = mergeScoreMaps scoreMap scoreMap'
           scores = filterFollowing settingsFollowRegex $ Map.elems scoreMap''
@@ -112,8 +114,8 @@ getScore mType =
         typeQuery = maybe "" (("&type=" ++) . show) mType
 
     request <- buildRequest $ do
-      http GET (B8.pack $ "/tennis_livescore.php?t=live" ++ typeQuery ++ "&" ++
-                show currentTS)
+      http GET (B8.pack $ "/tennis_livescore.php?t=live" ++ typeQuery ++
+                "&" ++ show currentTS)
       setAccept "text/html"
 
     sendRequest conn request emptyBody
@@ -157,11 +159,11 @@ parseScores inp = maybe [] extractScores mMatchTable
       name <- lookupText =<< subtrees !!? i
       isServer <- containsImage <$> subtrees !!? i
 
-      let set1 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+2)
-          set2 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+3)
-          set3 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+4)
-          set4 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+5)
-          set5 = fromMaybe 0 $ lookupGame  =<< subtrees !!? (i+6)
+      let set1 = fromMaybe 0 $ lookupGame =<< subtrees !!? (i+2)
+          set2 = fromMaybe 0 $ lookupGame =<< subtrees !!? (i+3)
+          set3 = fromMaybe 0 $ lookupGame =<< subtrees !!? (i+4)
+          set4 = fromMaybe 0 $ lookupGame =<< subtrees !!? (i+5)
+          set5 = fromMaybe 0 $ lookupGame =<< subtrees !!? (i+6)
           currentGame = fromMaybe 0 $ lookupPoint =<< subtrees !!? (i+7)
 
       return $ Player name [set1, set2, set3, set4, set5] isServer currentGame
@@ -230,8 +232,8 @@ cleanWhiteSpace (TagBranch str attrs subtrees) =
   Just . TagBranch str attrs . catMaybes $ map cleanWhiteSpace subtrees
 
 lookupText :: TagTree B.ByteString -> Maybe B.ByteString
-lookupText (TagLeaf (TagText str)) = Just str
-lookupText (TagLeaf _) = Nothing
+lookupText (TagLeaf (TagText str))  = Just str
+lookupText (TagLeaf _)              = Nothing
 lookupText (TagBranch _ _ subtrees) =
   listToMaybe $ mapMaybe lookupText subtrees
 
@@ -259,6 +261,7 @@ readDirectory :: FilePath -> IO [FilePath]
 readDirectory dir = do
   names <- getDirectoryContents dir
   let properNames = filter (`notElem` [".", ".."]) names
+
   paths <- forM properNames $ \name -> do
     let path = dir </> name
     isDirectory <- doesDirectoryExist path
@@ -323,4 +326,3 @@ player1 `isLeading` player2 =
 
 lower :: String -> String
 lower = map toLower
-
