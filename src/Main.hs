@@ -11,7 +11,8 @@ import           Options.Applicative.Arrows
 import           AtpLiveScore
 
 data Args = Args
-    { aFollow  :: String
+    { aPlayer  :: String
+    , aMatch   :: String
     , aType    :: String
     , aRefresh :: Int
     , aImgDir  :: FilePath
@@ -21,12 +22,18 @@ data Args = Args
 
 args :: Parser Args
 args = runA $ proc () -> do
-  aFollow  <- asA $ strOption (value ""
-                               <> short 'f'
-                               <> long "follow"
+  aPlayer  <- asA $ strOption (value ""
+                               <> short 'p'
+                               <> long "player"
                                <> metavar "REGEX"
                                <> help "Only scores of players are shown, \
                                   \whose names match the regex") -< ()
+  aMatch   <- asA $ strOption (value ""
+                               <> short 'm'
+                               <> long "match"
+                               <> metavar "REGEX"
+                               <> help "Only scores of matches are shown, \
+                                  \which match the regex") -< ()
   aType    <- asA $ strOption (value ""
                                <> short 't'
                                <> long "type"
@@ -58,8 +65,9 @@ main = do
 
   where
     mkSettings Args{..} =
-      let mFollow = if null aFollow then Nothing else Just $ B8.pack aFollow
+      let mPlayer = if null aPlayer then Nothing else Just $ B8.pack aPlayer
+          mMatch  = if null aMatch  then Nothing else Just $ B8.pack aMatch
           mType   = if null aType then Nothing else Just $ read aType
           mImgDir = if null aImgDir then Nothing else Just aImgDir
       in
-       Settings mFollow mType aRefresh mImgDir
+       Settings mPlayer mMatch mType aRefresh mImgDir

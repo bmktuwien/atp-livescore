@@ -40,7 +40,8 @@ instance Read TourType where
   readsPrec _ _     = error "unknown tour type"
 
 data Settings = Settings
-    { settingsFollowRegex :: Maybe B.ByteString
+    { settingsPlayerRegex :: Maybe B.ByteString
+    , settingsMatchRegex  :: Maybe B.ByteString
     , settingsTourType    :: Maybe TourType
     , settingsRefresh     :: !Int
     , settingsImgDir      :: Maybe FilePath
@@ -75,7 +76,9 @@ startTicker Settings{..} = do
 
       let scoreMap' = fromScores $ maybe [] parseScores mResp
           scoreMap'' = mergeScoreMaps scoreMap scoreMap'
-          scores = filterFollowing settingsFollowRegex $ Map.elems scoreMap''
+          scores = filterPlayers settingsPlayerRegex .
+                   filterMatches settingsMatchRegex
+                   $ Map.elems scoreMap''
 
       mapM_ (notifyScore imgMap) scores
 
@@ -97,11 +100,16 @@ startTicker Settings{..} = do
             (scorePlayer2 s1 == scorePlayer2 s2) = s1
           | otherwise = s2
 
-    filterFollowing Nothing      = id
-    filterFollowing (Just regex) = filter f
+    filterPlayers Nothing      = id
+    filterPlayers (Just regex) = filter f
       where
         f Score{..} = regexMatches regex (playerName scorePlayer1) ||
                       regexMatches regex (playerName scorePlayer2)
+
+    filterMatches Nothing      = id
+    filterMatches (Just regex) = filter f
+      where
+        f Score{..} = regexMatches regex scoreMatch
 
 -- | Retrieves the score from 'tennislive.at' server.
 -- The response is an HTML document which should be parsed by 'parseScore'.
